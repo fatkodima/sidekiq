@@ -261,6 +261,16 @@ module Sidekiq
     end
 
     def atomic_push(conn, payloads)
+      if ENV["DEBUG_SIDEKIQ_JOBS_ENQUEUES"]
+        jids = payloads.map { |p| p["jid"] }
+        backtrace = caller
+        backtrace = backtrace.select { |b| b.include?("sidekiq") || b.include?("redis") }
+        gems_path = Bundler.bundle_path.to_s
+        backtrace = backtrace.map { |b| b.delete_prefix(gems_path) }
+
+        Sidekiq.logger.warn("Enq jobs #{jids.join(',')} #{backtrace.join(';')}")
+      end
+
       if payloads.first.key?("at")
         conn.zadd("schedule", payloads.flat_map { |hash|
           at = hash["at"].to_s

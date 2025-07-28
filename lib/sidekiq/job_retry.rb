@@ -196,6 +196,15 @@ module Sidekiq
       jitter = rand(10 * (count + 1))
       retry_at = Time.now.to_f + delay + jitter
       payload = Sidekiq.dump_json(msg)
+
+      if ENV["DEBUG_SIDEKIQ_JOBS_ENQUEUES"]
+        backtrace = caller
+        backtrace = backtrace.select { |b| b.include?("sidekiq") || b.include?("redis") }
+        gems_path = Bundler.bundle_path.to_s
+        backtrace = backtrace.map { |b| b.delete_prefix(gems_path) }
+        Sidekiq.logger.warn("Enq jobs #{msg['jid']} #{backtrace.join(';')}")
+      end
+
       redis do |conn|
         conn.zadd("retry", retry_at.to_s, payload)
       end
